@@ -1,6 +1,7 @@
 import os
 
 import cv2
+import torch
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
@@ -20,7 +21,7 @@ EMOTION_DICT = {
 
 
 class FER2013(Dataset):
-    def __init__(self, stage, configs, tta=False, tta_size=48):
+    def __init__(self, stage, configs, tta=False, tta_size=48, transform=None):
         self._stage = stage
         self._configs = configs
         self._tta = tta
@@ -35,10 +36,14 @@ class FER2013(Dataset):
         self._pixels = self._data["pixels"].tolist()
         self._emotions = pd.get_dummies(self._data["emotion"])
 
-        self._transform = transforms.Compose(
+        # Use o transform fornecido, ou o transform padrão
+        self._transform = transform or transforms.Compose(
             [
                 transforms.ToPILImage(),
                 transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+                transforms.RandomAffine(degrees=20, translate=(0.1, 0.1), scale=(0.8, 1.2)),
             ]
         )
 
@@ -61,9 +66,8 @@ class FER2013(Dataset):
             image = seg(image=image)
 
         if self._stage == "test" and self._tta == True:
-            images = [seg(image=image) for i in range(self._tta_size)]
-            # images = [image for i in range(self._tta_size)]
-            images = list(map(self._transform, images))
+            images = [seg(image=image) for _ in range(self._tta_size)]
+            images = torch.stack(list(map(self._transform, images)))  # Empilhar todas as imagens do TTA
             target = self._emotions.iloc[idx].idxmax()
             return images, target
 
@@ -72,9 +76,29 @@ class FER2013(Dataset):
         return image, target
 
 
-def fer2013(stage, configs=None, tta=False, tta_size=48):
-    return FER2013(stage, configs, tta, tta_size)
+def fer2013(stage, configs=None, tta=False, tta_size=48, transform=None):
+    """
+    Wrapper function to initialize the FER2013 dataset with optional TTA and transform.
+    
+    Parameters:
+    -----------
+    stage : str
+        Dataset stage, e.g., 'train', 'val', 'test'.
+    configs : dict
+        Configuration dictionary.
+    tta : bool
+        Whether to apply test-time augmentation (TTA).
+    tta_size : int
+        Number of augmentations for TTA.
+    transform : torchvision.transforms.Compose
+        Transformations to apply to the images.
 
+    Returns:
+    --------
+    FER2013
+        An instance of the FER2013 dataset.
+    """
+    return FER2013(stage, configs, tta, tta_size, transform)
 
 if __name__ == "__main__":
     data = FER2013(

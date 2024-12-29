@@ -137,3 +137,8 @@ saved
 pretrained_ckpt
 version.py
 *.swp
+data/
+data2/
+checkpoints/
+checkpoint/
+log/

@@ -320,22 +320,7 @@ class FER2013Trainer(Trainer):
 
     def train(self):
         """make a training job"""
-        # print(self._model)
-
-        # freeze the model
-
-        """
-        print('=' * 10)
-        for idx, child in enumerate(self._model.children()):
-            if idx < 6:
-                print(child)
-                print('=' * 10)
-
-                for m in child.parameters():
-                    m.requires_grad = False
-          """
-
-        # exit(0)
+        self._load_checkpoint()  # Carregar checkpoint existente, se houver
 
         try:
             while not self._is_stop():
@@ -346,6 +331,18 @@ class FER2013Trainer(Trainer):
                 self._update_training_state()
                 self._logging()
         except KeyboardInterrupt:
+            traceback.print_exc()
+
+        # Avaliar após o treinamento
+        try:
+            if not self._test_set.is_tta():
+                self._test_acc = self._calc_acc_on_private_test()
+            else:
+                self._test_acc = self._calc_acc_on_private_test_with_tta()
+
+            # Salvar o último modelo após o treinamento
+            self._save_weights(best=False)
+        except Exception:
             traceback.print_exc()
 
         # training stop
@@ -439,8 +436,29 @@ class FER2013Trainer(Trainer):
 
     def _increase_epoch_num(self):
         self._current_epoch_num += 1
+        
+        
+    def _load_checkpoint(self):
+        last_model_path = os.path.join(
+            self._checkpoint_dir, self._configs["last_model_name"]
+        )
+        if os.path.exists(last_model_path):
+            print(f"Loading last checkpoint from {last_model_path}")
+            checkpoint = torch.load(last_model_path)
+            self._model.load_state_dict(checkpoint["net"])
+            self._best_val_loss = checkpoint["best_val_loss"]
+            self._best_val_acc = checkpoint["best_val_acc"]
+            self._train_loss_list = checkpoint["train_losses"]
+            self._val_loss_list = checkpoint["val_loss_list"]
+            self._train_acc_list = checkpoint["train_acc_list"]
+            self._val_acc_list = checkpoint["val_acc_list"]
+            self._current_epoch_num = len(self._train_loss_list)
+            print("Checkpoint loaded successfully")
+        else:
+            print("No checkpoint found, starting from scratch")
 
-    def _save_weights(self, test_acc=0.0):
+
+    def _save_weights(self, test_acc=0.0, best=False):
         if self._distributed == 0:
             state_dict = self._model.state_dict()
         else:
@@ -460,4 +478,17 @@ class FER2013Trainer(Trainer):
             "test_acc": self._test_acc,
         }
 
-        torch.save(state, self._checkpoint_path)
+        if best:
+            # Salvar o melhor modelo
+            best_model_path = os.path.join(
+                self._checkpoint_dir, self._configs["best_model_name"]
+            )
+            torch.save(state, best_model_path)
+            print(f"Best model saved to {best_model_path}")
+        else:
+            # Salvar o último modelo
+            last_model_path = os.path.join(
+                self._checkpoint_dir, self._configs["last_model_name"]
+            )
+            torch.save(state, last_model_path)
+            print(f"Last model saved to {last_model_path}")

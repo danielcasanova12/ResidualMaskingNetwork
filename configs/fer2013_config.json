@@ -1,5 +1,5 @@
 {
-	"data_path": "data",
+	"data_path": "data/",
 	"image_size": 224,
 	"in_channels": 3,
 	"num_classes": 7,
@@ -10,7 +10,7 @@
 	"weight_decay": 0.001,
 	"distributed": 0,
 	"batch_size": 48,
-	"num_workers": 8,
+	"num_workers": 6,
 	"device": "cuda:0",
 	"max_epoch_num": 50,
 	"max_plateau_count": 8,
@@ -18,5 +18,7 @@
 	"steplr": 50,
 	"log_dir": "log",
 	"checkpoint_dir": "checkpoint",
-	"model_name": "test"
+	"model_name": "test",
+	"best_model_name": "best_modelv2.pth",
+    "last_model_name": "last_modelv2.pth"
 }
